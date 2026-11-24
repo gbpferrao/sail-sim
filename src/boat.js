@@ -163,17 +163,6 @@ export function createBoat() {
   );
   keel.add(keelEdges);
 
-  // Animated wave ring that visually rides along the propagation front
-  const waveRingGeo = new THREE.TorusGeometry(0.65, 0.03, 12, 48);
-  waveRingGeo.rotateX(Math.PI / 2);
-  const waveRingMat = new THREE.MeshBasicMaterial({
-    color: 0xf97316,
-    transparent: true,
-    opacity: 0,
-  });
-  const waveRing = new THREE.Mesh(waveRingGeo, waveRingMat);
-  root.add(waveRing);
-
   return {
     root,
     hull,
@@ -182,7 +171,6 @@ export function createBoat() {
     sailMesh,
     keel,
     waveUniforms,
-    waveRing,
     dims: {
       sailWidth,
       sailHeight,
