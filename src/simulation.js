@@ -35,7 +35,7 @@ export class SailSimulation {
     this.onPhaseChange = onPhaseChange;
 
     this.windAngleDeg = 135;
-    this.windStrength = 1.0;
+    this.windStrength = 0.3;
     this.sailAngleDeg = -32;
     this.speed = 1.0;
     this.paused = false;
