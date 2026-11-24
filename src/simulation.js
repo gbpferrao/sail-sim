@@ -132,18 +132,18 @@ export class SailSimulation {
       const mesh = new THREE.Mesh(geo, mat);
       this.waterGroup.add(mesh);
 
-      // Arrange in a neat 3D cloud beside the keel
+      // Arrange in a staggered 3D cloud beside the keel so the keel sweeps through them gradually
       const row = i % 4;
       const col = Math.floor(i / 4) % 5;
-      const depth = Math.floor(i / 20);
-      const jitterX = (Math.sin(i * 12.9898) * 0.5) * 0.14;
-      const jitterY = (Math.cos(i * 78.233) * 0.5) * 0.14;
-      const jitterZ = (Math.sin(i * 39.425) * 0.5) * 0.16;
+      const layer = Math.floor(i / 20);
+      const staggerX = (i / count) * 0.62 + (Math.sin(i * 12.9898) * 0.5) * 0.08;
+      const jitterY = (Math.cos(i * 78.233) * 0.5) * 0.12;
+      const jitterZ = (Math.sin(i * 39.425) * 0.5) * 0.14;
 
       this.waterMolecules.push({
         mesh,
         localRest: new THREE.Vector3(
-          0.42 + depth * 0.26 + jitterX,
+          0.46 + staggerX + layer * 0.06,
           -0.45 - row * 0.32 + jitterY,
           -0.62 + col * 0.34 + jitterZ
         ),
@@ -488,12 +488,12 @@ export class SailSimulation {
   }
 
   _updateKeelWater(dt) {
-    const duration = 2.0;
+    const duration = 2.4;
     const t = Math.min(1, this.phaseTime / duration);
 
-    // Keel pushes further into the water molecule cluster, then settles against water resistance
-    const pushCurve = Math.sin(t * Math.PI * 0.5);
-    const extraPushX = this.waterSide * 0.22 * pushCurve;
+    // Keel sweeps steadily into the staggered water molecule cluster
+    const pushCurve = 1 - Math.pow(1 - t, 1.6);
+    const extraPushX = this.waterSide * 0.68 * pushCurve;
     this.boat.root.position.set(
       this.boatBasePos.x + this.boatPhase3Offset.x + extraPushX,
       0,
@@ -503,24 +503,29 @@ export class SailSimulation {
     const keelWorld = new THREE.Vector3();
     this.boat.keel.getWorldPosition(keelWorld);
 
-    // Collide keel region with water molecules & accumulate reaction vector
+    // Collide keel face with water molecules one by one & accumulate reaction vector with decay
+    const targetReactionMag = Math.abs(this.lockedSailForce.x) * 0.9;
     for (const m of this.waterMolecules) {
-      const dx = m.pos.x - keelWorld.x;
+      const dx = (m.pos.x - keelWorld.x) * this.waterSide;
       const dz = m.pos.z - keelWorld.z;
-      const distX = Math.abs(dx);
       const inKeelZ = Math.abs(dz) < 0.95;
 
-      if (!m.hit && distX < 0.48 && inKeelZ) {
+      if (!m.hit && dx < 0.18 && dx > -0.25 && inKeelZ) {
         m.hit = true;
         m.hitFlash = 1.0;
 
         // Water molecule deflects outward, imparting an opposite reaction impulse onto the keel
-        m.vel.set(this.waterSide * (1.2 + Math.random() * 0.6), (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.5);
+        m.vel.set(this.waterSide * (1.1 + Math.random() * 0.5), (Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.45);
 
-        // Keel reaction opposes the lateral (X) component of the sail force
-        const reactionMag = Math.abs(this.lockedSailForce.x) * 0.085 + 0.04;
-        const impulse = new THREE.Vector3(-this.waterSide * reactionMag, 0, 0);
+        // Each hit adds a modest impulse so the combined vector visibly builds up
+        const perHitMag = Math.max(0.06, targetReactionMag * 0.14);
+        const impulse = new THREE.Vector3(-this.waterSide * perHitMag, 0, 0);
         this.keelAccumVec.add(impulse);
+
+        // Clamp so it doesn't overshoot the physical lateral resistance
+        if (this.keelAccumVec.length() > targetReactionMag * 1.15 && targetReactionMag > 0.05) {
+          this.keelAccumVec.setLength(targetReactionMag * 1.15);
+        }
 
         m.mesh.material.color.setHex(0xffffff);
         m.mesh.material.emissive.setHex(0x22d3ee);
@@ -540,14 +545,16 @@ export class SailSimulation {
       }
     }
 
-    // Short decay so water impulses visibly combine in the keel region
-    this.keelAccumVec.multiplyScalar(Math.exp(-dt * 0.45));
+    // Short decay so individual water impulses visibly pulse and combine in the keel region
+    this.keelAccumVec.multiplyScalar(Math.exp(-dt * 1.15));
     if (this.keelAccumVec.length() > this.lockedKeelForce.length()) {
       this.lockedKeelForce.copy(this.keelAccumVec);
     }
 
     if (this.keelAccumVec.length() > 0.04) {
       this.keelArrow.set(keelWorld, this.keelAccumVec);
+    } else {
+      this.keelArrow.hide();
     }
 
     // Update sail arrow position with boat
