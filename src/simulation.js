@@ -587,34 +587,32 @@ export class SailSimulation {
     const keelWorld = new THREE.Vector3();
     this.boat.keel.getWorldPosition(keelWorld);
     const mastRoot = this._getMastRoot();
-    const sailTip = mastRoot.clone().add(this.lockedSailForce);
 
-    // Hide hull ghost arrows — we show the real tip-to-tail combo directly on the sail & keel arrows
+    // Hide hull ghost arrows — sail, keel, and resultant all meet at mastRoot
     this.hullSailGhost.hide();
     this.hullKeelGhost.hide();
 
     if (this.phaseTime <= slideDuration) {
-      // Part A: Upward cyan propagation wave from keel -> hull + keel vector slides up to meet sail vector at mast root
+      // Part A: Upward cyan propagation wave from keel -> hull + keel vector slides straight up to mast root
       const t = this.phaseTime / slideDuration;
       const eased = t * t * (3 - 2 * t);
       const currentY = THREE.MathUtils.lerp(-1.45, 0.35, t);
       this.boat.waveUniforms.uUpActive.value = Math.sin(t * Math.PI);
       this.boat.waveUniforms.uUpY.value = currentY;
 
-      // Slide keel arrow origin smoothly from keel center to the tip of the sail vector at mast root
-      const slidOrigin = keelWorld.clone().lerp(sailTip, eased);
+      const slidOrigin = keelWorld.clone().lerp(mastRoot, eased);
       this.sailArrow.set(mastRoot, this.lockedSailForce);
       this.keelArrow.set(slidOrigin, this.lockedKeelForce);
       this.netArrow.hide();
     } else if (this.phaseTime <= slideDuration + resultantDuration) {
-      // Part B: Keel vector meets sail vector tip at mast root; grow the green resultant vector before moving
+      // Part B: Sail and keel vectors both rooted at mast root; grow the green resultant vector before moving
       this.boat.waveUniforms.uUpActive.value = 0;
 
       const rt = (this.phaseTime - slideDuration) / resultantDuration;
       const eased = 1 - Math.pow(1 - rt, 3);
 
       this.sailArrow.set(mastRoot, this.lockedSailForce);
-      this.keelArrow.set(sailTip, this.lockedKeelForce);
+      this.keelArrow.set(mastRoot, this.lockedKeelForce);
       this.netArrow.set(mastRoot, this.netMotionVec.clone().multiplyScalar(eased));
     } else {
       // Part C: Guided boat motion along the resultant vector
@@ -627,10 +625,9 @@ export class SailSimulation {
       this.boat.root.position.copy(this.boatPhase5Start).add(travel);
 
       const movedMastRoot = this._getMastRoot();
-      const movedSailTip = movedMastRoot.clone().add(this.lockedSailForce);
 
       this.sailArrow.set(movedMastRoot, this.lockedSailForce);
-      this.keelArrow.set(movedSailTip, this.lockedKeelForce);
+      this.keelArrow.set(movedMastRoot, this.lockedKeelForce);
       this.netArrow.set(movedMastRoot, this.netMotionVec);
 
       // Record wake trail
