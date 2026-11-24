@@ -410,7 +410,9 @@ export class SailSimulation {
     }
 
     if (this.sailAccumVec.length() > 0.05) {
-      this.sailArrow.set(this.sailHitWorld, this.sailAccumVec);
+      const sailCenter = new THREE.Vector3();
+      this.boat.sailMesh.getWorldPosition(sailCenter);
+      this.sailArrow.set(sailCenter, this.sailAccumVec);
     }
 
     // Transition to Phase 3 once the pulse has finished hitting
@@ -425,7 +427,9 @@ export class SailSimulation {
         const windDir = this.getWindDir();
         this.lockedSailForce.copy(windDir).multiplyScalar(0.8);
       }
-      this.sailArrow.set(this.sailHitWorld, this.lockedSailForce);
+      const sailCenter = new THREE.Vector3();
+      this.boat.sailMesh.getWorldPosition(sailCenter);
+      this.sailArrow.set(sailCenter, this.lockedSailForce);
 
       // Place water molecules on the side the keel will be pushed toward
       // (default wind 135°, sail -32° pushes -X, which is to the left of the keel)
@@ -473,10 +477,9 @@ export class SailSimulation {
       const lateralDir = this.waterSide;
       this.boatPhase3Offset.set(lateralDir * 0.36 * eased, 0, Math.sign(this.lockedSailForce.z) * 0.12 * eased);
       this.boat.root.position.copy(this.boatBasePos).add(this.boatPhase3Offset);
-      this.sailArrow.set(
-        this.sailHitWorld.clone().add(this.boatPhase3Offset),
-        this.lockedSailForce
-      );
+      const sailCenter = new THREE.Vector3();
+      this.boat.sailMesh.getWorldPosition(sailCenter);
+      this.sailArrow.set(sailCenter, this.lockedSailForce);
     }
 
     if (t >= 1) {
@@ -557,11 +560,10 @@ export class SailSimulation {
       this.keelArrow.hide();
     }
 
-    // Update sail arrow position with boat
-    this.sailArrow.set(
-      this.sailHitWorld.clone().add(this.boat.root.position),
-      this.lockedSailForce
-    );
+    // Update sail arrow position at center of sail
+    const sailCenter = new THREE.Vector3();
+    this.boat.sailMesh.getWorldPosition(sailCenter);
+    this.sailArrow.set(sailCenter, this.lockedSailForce);
 
     if (t >= 1) {
       // Ensure keel reaction cleanly cancels most of the lateral sail force
@@ -620,10 +622,9 @@ export class SailSimulation {
       const keelWorld = new THREE.Vector3();
       this.boat.keel.getWorldPosition(keelWorld);
       this.keelArrow.set(keelWorld, this.lockedKeelForce);
-      this.sailArrow.set(
-        this.sailHitWorld.clone().add(this.boat.root.position),
-        this.lockedSailForce
-      );
+      const sailCenter = new THREE.Vector3();
+      this.boat.sailMesh.getWorldPosition(sailCenter);
+      this.sailArrow.set(sailCenter, this.lockedSailForce);
 
       // Record wake trail
       const trailPt = this.boat.root.position.clone().setY(0.06);
